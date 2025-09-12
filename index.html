@@ -13,6 +13,7 @@
     button { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; margin-left:4px; }
     select { padding:4px 6px; margin-right:6px; }
     #alarmBtn { background:red; color:white; }
+    #etaBox { margin-top: 10px; font-size: 16px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -43,6 +44,7 @@
     <button id="alarmBtn">Secure Alarm</button>
   </div>
   <div id="map"></div>
+  <div id="etaBox">🕒 Arrival Time: Not Set</div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -51,7 +53,7 @@
   // ----------------------------
   const initialView = [30.3398, 76.3869]; // Patiala
   const initialZoom = 11;
-  const BUS_SPEED_MPS = 100; // ~100 km/h
+  const BUS_SPEED_MPS = 30; // ~108 km/h realistic
 
   // Support numbers
   const HELP_NUMBER = "1800-123-456";   // sample helpline
@@ -83,16 +85,17 @@
   }
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  // Speech helper
   function speak(text) {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-IN";   // English (India accent)
-      utterance.rate = 1;         // Speed
+      utterance.lang = "en-IN";
+      utterance.rate = 1;
       speechSynthesis.speak(utterance);
-    } else {
-      console.log("Speech synthesis not supported.");
     }
+  }
+
+  function formatTime(date) {
+    return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
   // ----------------------------
@@ -105,8 +108,8 @@
   }).addTo(map);
 
   // Bus stops markers
-  const stopMarkers = cityOrder.map(c => {
-    return L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
+  cityOrder.forEach(c => {
+    L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
       .addTo(map).bindPopup(c.name.charAt(0).toUpperCase() + c.name.slice(1));
   });
 
@@ -179,6 +182,7 @@
     if (route.length) busMarker.setLatLng(route[0]);
     busMarker.setIcon(busIcon);
     busMarker.bindPopup("Bus");
+    document.getElementById('etaBox').innerText = "🕒 Arrival Time: Not Set";
   }
 
   document.getElementById('startBtn').addEventListener('click', () => startAnimation());
@@ -211,10 +215,21 @@
 
     resetAnimation();
 
+    // ---- Calculate total distance ----
+    let totalDist = 0;
+    for (let i=0; i<route.length-1; i++) {
+      totalDist += haversineDistance(route[i][0], route[i][1], route[i+1][0], route[i+1][1]);
+    }
+    const totalTimeSec = totalDist / BUS_SPEED_MPS;
+    const arrivalTime = new Date(Date.now() + totalTimeSec * 1000);
+
+    document.getElementById('etaBox').innerText =
+      "🕒 Expected Arrival Time: " + formatTime(arrivalTime);
+
     // Voice announcement
     const startName = cityOrder[startIdx].name.charAt(0).toUpperCase() + cityOrder[startIdx].name.slice(1);
     const endName = cityOrder[endIdx].name.charAt(0).toUpperCase() + cityOrder[endIdx].name.slice(1);
-    speak(`The bus is starting from ${startName} and will reach ${endName}.`);
+    speak(`The bus is starting from ${startName} and will reach ${endName} at around ${formatTime(arrivalTime)}.`);
   });
 
   // ----------------------------
