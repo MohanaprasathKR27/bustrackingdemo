@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Bus Tracking Prototype — Punjab Small Cities</title>
+  <title>Multi-Bus Tracking Prototype — Punjab Small Cities</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
@@ -12,15 +12,18 @@
     .controls { margin: 8px 0; }
     button { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; margin-left:4px; }
     select { padding:4px 6px; margin-right:6px; }
-    #alarmBtn { background:red; color:white; }
-    #etaBox { margin-top: 10px; font-size: 16px; font-weight: bold; }
+    .bus-box { margin-top:10px; font-weight:bold; background:#f9f9f9; padding:6px; border-radius:5px; border:1px solid #ccc; }
+    .bus-header { font-size:14px; font-weight:bold; margin-bottom:4px; }
   </style>
 </head>
 <body>
-  <h2>🚍 Real-Time Bus Tracking — Punjab Small Cities (Prototype)</h2>
+  <h2>🚍 Multi-Bus Real-Time Tracking — Punjab Small Cities</h2>
+  
+  <!-- Bus 1 Controls -->
   <div class="controls">
-    <label>Start: 
-      <select id="startSelect">
+    <div class="bus-header">🚌 Bus 1</div>
+    <label>Start:
+      <select id="start1">
         <option value="patiala">Patiala</option>
         <option value="nabha">Nabha</option>
         <option value="morinda">Morinda</option>
@@ -28,8 +31,8 @@
         <option value="sirhind">Sirhind</option>
       </select>
     </label>
-    <label>End: 
-      <select id="endSelect">
+    <label>End:
+      <select id="end1">
         <option value="patiala">Patiala</option>
         <option value="nabha">Nabha</option>
         <option value="morinda">Morinda</option>
@@ -37,29 +40,76 @@
         <option value="sirhind">Sirhind</option>
       </select>
     </label>
-    <button id="setRouteBtn">Set Route</button>
-    <button id="startBtn">Start Animation</button>
-    <button id="resetBtn">Reset</button>
-    <button id="helpBtn">Help</button>
-    <button id="alarmBtn">Secure Alarm</button>
+    <button onclick="setRoute(1)">Set Route</button>
+    <button onclick="startAnimation(1)">Start</button>
+    <button onclick="resetAnimation(1)">Reset</button>
   </div>
+  <div id="eta1" class="bus-box">ℹ️ Bus 1 info will appear here.</div>
+
+  <!-- Bus 2 Controls -->
+  <div class="controls">
+    <div class="bus-header">🚌 Bus 2</div>
+    <label>Start:
+      <select id="start2">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <label>End:
+      <select id="end2">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <button onclick="setRoute(2)">Set Route</button>
+    <button onclick="startAnimation(2)">Start</button>
+    <button onclick="resetAnimation(2)">Reset</button>
+  </div>
+  <div id="eta2" class="bus-box">ℹ️ Bus 2 info will appear here.</div>
+
+  <!-- Bus 3 Controls -->
+  <div class="controls">
+    <div class="bus-header">🚌 Bus 3</div>
+    <label>Start:
+      <select id="start3">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <label>End:
+      <select id="end3">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <button onclick="setRoute(3)">Set Route</button>
+    <button onclick="startAnimation(3)">Start</button>
+    <button onclick="resetAnimation(3)">Reset</button>
+  </div>
+  <div id="eta3" class="bus-box">ℹ️ Bus 3 info will appear here.</div>
+
+  <!-- Help & Alarm -->
+  <div class="controls">
+    <button id="helpBtn">Help</button>
+    <button id="alarmBtn" style="background:red; color:white;">Secure Alarm</button>
+  </div>
+
   <div id="map"></div>
-  <div id="etaBox">🕒 Arrival Info: Not Set</div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-  // ----------------------------
-  // Configuration
-  // ----------------------------
-  const initialView = [30.3398, 76.3869]; // Patiala
-  const initialZoom = 11;
-  const BUS_SPEED_MPS = 30; // ~108 km/h realistic
-
-  // Support numbers
-  const HELP_NUMBER = "1800-123-456";   // sample helpline
-  const ALARM_NUMBER = "100";           // emergency number
-
-  // Cities in order along the main route
   const cityOrder = [
     { name: "patiala", coords: [30.3398, 76.3869] },
     { name: "nabha",   coords: [30.3745, 76.1520] },
@@ -68,204 +118,144 @@
     { name: "sirhind", coords: [30.6450, 76.3841] }
   ];
 
-  let route = [];
-  let poly = null;
+  const BUS_SPEED_MPS = 27.7; // ~100 km/h
+  const colors = ["#2E86AB","#28B463","#AF7AC5"]; // 3 routes
 
-  // ----------------------------
-  // Helpers
-  // ----------------------------
-  function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const toRad = deg => deg * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
-  function lerp(a, b, t) { return a + (b - a) * t; }
+  // Map
+  const map = L.map('map').setView(cityOrder[0].coords, 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
 
-  function speak(text) {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-IN";
-      utterance.rate = 1;
-      speechSynthesis.speak(utterance);
-    }
-  }
-
-  function formatTime(date) {
-    return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-  }
-
-  // ----------------------------
-  // Initialize Map
-  // ----------------------------
-  const map = L.map('map').setView(initialView, initialZoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 19
-  }).addTo(map);
-
-  // Bus stops markers
+  // City markers
   cityOrder.forEach(c => {
     L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
-      .addTo(map).bindPopup(c.name.charAt(0).toUpperCase() + c.name.slice(1));
+      .addTo(map).bindPopup(c.name.charAt(0).toUpperCase()+c.name.slice(1));
   });
 
-  // Bus icon
-  const busIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61205.png',
-    iconSize: [42, 42],
-    iconAnchor: [21, 21]
-  });
-  let busMarker = L.marker(initialView, {icon: busIcon}).addTo(map).bindPopup("Bus");
+  // Bus Data Structures
+  let buses = {
+    1: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+         segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 },
+    2: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+         segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 },
+    3: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+         segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 }
+  };
 
-  // ----------------------------
-  // Animation
-  // ----------------------------
-  let animating = false;
-  let currentSegment = 0;
-  let rafId = null;
-  let segmentStartTime = null;
-  let segmentDurationMs = 0;
-  let segStartLatLng = null;
-  let segEndLatLng = null;
-
-  function startSegment(idx) {
-    if (idx >= route.length - 1) { animating = false; return; }
-    currentSegment = idx;
-    segStartLatLng = {lat: route[idx][0], lng: route[idx][1]};
-    segEndLatLng   = {lat: route[idx+1][0], lng: route[idx+1][1]};
-    const dist = haversineDistance(segStartLatLng.lat, segStartLatLng.lng, segEndLatLng.lat, segEndLatLng.lng);
-    const durationSec = dist / BUS_SPEED_MPS;
-    segmentDurationMs = Math.max(300, Math.round(durationSec * 1000));
-    segmentStartTime = null;
-    rafId = requestAnimationFrame(step);
+  // Bus Icons
+  function busIcon(color) {
+    return L.icon({
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61205.png",
+      iconSize: [36,36],
+      iconAnchor: [18,18],
+      className: "bus-icon-"+color
+    });
   }
 
-  function step(timestamp) {
-    if (!segmentStartTime) segmentStartTime = timestamp;
-    const elapsed = timestamp - segmentStartTime;
-    const t = Math.min(1, elapsed / segmentDurationMs);
+  // Helpers
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R=6371000,toRad=d=>d*Math.PI/180;
+    const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+    const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  function lerp(a,b,t){return a+(b-a)*t;}
+  function formatTime(d){return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
+  function speak(msg){window.speechSynthesis.speak(new SpeechSynthesisUtterance(msg));}
 
-    const lat = lerp(segStartLatLng.lat, segEndLatLng.lat, t);
-    const lng = lerp(segStartLatLng.lng, segEndLatLng.lng, t);
-    busMarker.setLatLng([lat, lng]);
+  // Set Route
+  function setRoute(id){
+    const start=document.getElementById("start"+id).value;
+    const end=document.getElementById("end"+id).value;
+    if(start===end){alert("Start and End cannot be same!");return;}
+    const sIdx=cityOrder.findIndex(c=>c.name===start);
+    const eIdx=cityOrder.findIndex(c=>c.name===end);
+    let r;
+    if(sIdx<eIdx) r=cityOrder.slice(sIdx,eIdx+1).map(c=>c.coords);
+    else r=cityOrder.slice(eIdx,sIdx+1).map(c=>c.coords).reverse();
+    let bus=buses[id];
+    bus.route=r;
+    if(bus.poly) map.removeLayer(bus.poly);
+    bus.poly=L.polyline(r,{color:colors[id-1],weight:5}).addTo(map);
+    map.fitBounds(bus.poly.getBounds(),{padding:[50,50]});
+    resetAnimation(id);
+    // Distances
+    bus.distances=[]; bus.total=0;
+    for(let i=0;i<r.length-1;i++){
+      const d=haversine(r[i][0],r[i][1],r[i+1][0],r[i+1][1]);
+      bus.distances.push(d); bus.total+=d;
+    }
+    const km=(bus.total/1000).toFixed(2);
+    const etaSec=bus.total/BUS_SPEED_MPS;
+    const arr=new Date(Date.now()+etaSec*1000);
+    document.getElementById("eta"+id).innerText=`🚌 Bus ${id} | Distance: ${km} km | ETA: ${formatTime(arr)}`;
+    speak(`Bus ${id} will travel ${km} kilometers. Arrival at ${formatTime(arr)}.`);
+  }
 
-    const remainingDist = haversineDistance(lat, lng, segEndLatLng.lat, segEndLatLng.lng);
-    const etaSec = Math.round(remainingDist / BUS_SPEED_MPS);
-    busMarker.bindPopup("Bus — ETA: " + etaSec + " s");
+  // Start Animation
+  function startAnimation(id){
+    const bus=buses[id];
+    if(bus.animating||bus.route.length<2)return;
+    bus.animating=true; bus.seg=0; bus.covered=0; bus.lastKmMilestone=0;
+    startSeg(id);
+  }
 
-    if (t < 1) {
-      rafId = requestAnimationFrame(step);
-    } else {
-      currentSegment++;
-      if (currentSegment < route.length - 1) {
-        setTimeout(() => startSegment(currentSegment), 800);
-      } else {
-        animating = false;
-      }
+  function startSeg(id){
+    const bus=buses[id];
+    if(bus.seg>=bus.route.length-1){bus.animating=false;speak(`Bus ${id} has finished its route.`);return;}
+    bus.segStart={lat:bus.route[bus.seg][0],lng:bus.route[bus.seg][1]};
+    bus.segEnd={lat:bus.route[bus.seg+1][0],lng:bus.route[bus.seg+1][1]};
+    const dist=bus.distances[bus.seg];
+    bus.segDur=dist/BUS_SPEED_MPS*1000;
+    bus.segStartTime=null;
+    bus.raf=requestAnimationFrame(ts=>step(id,ts));
+  }
+
+  function step(id,timestamp){
+    const bus=buses[id];
+    if(!bus.segStartTime) bus.segStartTime=timestamp;
+    const elapsed=timestamp-bus.segStartTime;
+    const t=Math.min(1,elapsed/bus.segDur);
+    const lat=lerp(bus.segStart.lat,bus.segEnd.lat,t);
+    const lng=lerp(bus.segStart.lng,bus.segEnd.lng,t);
+    if(!bus.marker) bus.marker=L.marker([lat,lng],{icon:busIcon(colors[id-1])}).addTo(map);
+    else bus.marker.setLatLng([lat,lng]);
+    const segDist=bus.distances[bus.seg];
+    const coveredNow=bus.covered+segDist*t;
+    const remain=bus.total-coveredNow;
+    const etaSec=remain/BUS_SPEED_MPS;
+    const eta=new Date(Date.now()+etaSec*1000);
+    document.getElementById("eta"+id).innerText=
+      `🚌 Bus ${id} | Covered ${(coveredNow/1000).toFixed(2)} km | Remaining ${(remain/1000).toFixed(2)} km | ETA: ${formatTime(eta)}`;
+    // Milestone announcement every 5 km
+    const kmDone=Math.floor(coveredNow/1000);
+    if(kmDone>=bus.lastKmMilestone+5){
+      bus.lastKmMilestone=kmDone;
+      speak(`Bus ${id} has covered ${kmDone} kilometers.`);
+    }
+    if(t<1){bus.raf=requestAnimationFrame(ts=>step(id,ts));}
+    else{
+      bus.covered+=segDist;
+      const city=cityOrder.find(c=>Math.abs(c.coords[0]-bus.segEnd.lat)<0.01&&Math.abs(c.coords[1]-bus.segEnd.lng)<0.01);
+      if(city){speak(`Bus ${id} has reached ${city.name}.`);}
+      bus.seg++; setTimeout(()=>startSeg(id),600);
     }
   }
 
-  function startAnimation() {
-    if (animating || route.length < 2) return;
-    animating = true;
-    startSegment(0);
+  // Reset
+  function resetAnimation(id){
+    const bus=buses[id];
+    cancelAnimationFrame(bus.raf);
+    bus.animating=false; bus.seg=0; bus.covered=0;
+    if(bus.route.length){
+      if(!bus.marker) bus.marker=L.marker(bus.route[0],{icon:busIcon(colors[id-1])}).addTo(map);
+      else bus.marker.setLatLng(bus.route[0]);
+    }
+    document.getElementById("eta"+id).innerText=`ℹ️ Bus ${id} info will appear here.`;
   }
 
-  function resetAnimation() {
-    cancelAnimationFrame(rafId);
-    animating = false;
-    currentSegment = 0;
-    if (route.length) busMarker.setLatLng(route[0]);
-    busMarker.setIcon(busIcon);
-    busMarker.bindPopup("Bus");
-    document.getElementById('etaBox').innerText = "🕒 Arrival Info: Not Set";
-  }
-
-  document.getElementById('startBtn').addEventListener('click', () => startAnimation());
-  document.getElementById('resetBtn').addEventListener('click', () => resetAnimation());
-
-  // ----------------------------
-  // Set Route Button
-  // ----------------------------
-  document.getElementById('setRouteBtn').addEventListener('click', () => {
-    const startCity = document.getElementById('startSelect').value;
-    const endCity   = document.getElementById('endSelect').value;
-
-    if (startCity === endCity) {
-      alert("Start and End cannot be the same!");
-      return;
-    }
-
-    const startIdx = cityOrder.findIndex(c => c.name === startCity);
-    const endIdx   = cityOrder.findIndex(c => c.name === endCity);
-
-    if (startIdx < endIdx) {
-      route = cityOrder.slice(startIdx, endIdx + 1).map(c => c.coords);
-    } else {
-      route = cityOrder.slice(endIdx, startIdx + 1).map(c => c.coords).reverse();
-    }
-
-    if (poly) map.removeLayer(poly);
-    poly = L.polyline(route, {color: '#2E86AB', weight: 5}).addTo(map);
-    map.fitBounds(poly.getBounds(), {padding: [50,50]});
-
-    resetAnimation();
-
-    // ---- Calculate total distance ----
-    let totalDist = 0;
-    for (let i=0; i<route.length-1; i++) {
-      totalDist += haversineDistance(route[i][0], route[i][1], route[i+1][0], route[i+1][1]);
-    }
-    const totalDistKm = (totalDist / 1000).toFixed(2);
-    const totalTimeSec = totalDist / BUS_SPEED_MPS;
-    const arrivalTime = new Date(Date.now() + totalTimeSec * 1000);
-
-    document.getElementById('etaBox').innerText =
-      `🕒 Expected Arrival Time: ${formatTime(arrivalTime)} | 📏 Distance: ${totalDistKm} km`;
-
-    // Voice announcement
-    const startName = cityOrder[startIdx].name.charAt(0).toUpperCase() + cityOrder[startIdx].name.slice(1);
-    const endName = cityOrder[endIdx].name.charAt(0).toUpperCase() + cityOrder[endIdx].name.slice(1);
-    speak(`The bus is starting from ${startName} and will reach ${endName}. 
-           The total distance is ${totalDistKm} kilometers and the expected arrival time is around ${formatTime(arrivalTime)}.`);
-  });
-
-  // ----------------------------
-  // Help Button
-  // ----------------------------
-  document.getElementById('helpBtn').addEventListener('click', () => {
-    alert("📖 Help & Support\n\nFor route assistance, please call:\n" + HELP_NUMBER);
-    speak(`For help and support, please call ${HELP_NUMBER}`);
-  });
-
-  // ----------------------------
-  // Secure Alarm Button
-  // ----------------------------
-  let alarmActive = false;
-  document.getElementById('alarmBtn').addEventListener('click', () => {
-    alarmActive = !alarmActive;
-    if (alarmActive) {
-      busMarker.setIcon(L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/565/565547.png",
-        iconSize: [42, 42],
-        iconAnchor: [21, 21]
-      }));
-      busMarker.bindPopup("🚨 EMERGENCY! Call " + ALARM_NUMBER);
-      document.getElementById('alarmBtn').innerText = "Alarm ON";
-      document.getElementById('alarmBtn').style.background = "darkred";
-      alert("🚨 Emergency Alert!\n\nBus location shared.\nPlease call: " + ALARM_NUMBER);
-      speak(`Emergency! Please call ${ALARM_NUMBER}`);
-    } else {
-      busMarker.setIcon(busIcon);
-      busMarker.bindPopup("Bus");
-      document.getElementById('alarmBtn').innerText = "Secure Alarm";
-      document.getElementById('alarmBtn').style.background = "red";
-    }
-  });
+  // Help & Alarm
+  document.getElementById('helpBtn').onclick=()=>alert("📖 Help:\n1. Select Start & End.\n2. Set Route.\n3. Start.\n☎️ Support: 1800-123-4567");
+  document.getElementById('alarmBtn').onclick=()=>{speak("Emergency! Authorities have been alerted.");alert("🚨 Emergency activated! Call 100 or 112.");};
   </script>
 </body>
 </html>
