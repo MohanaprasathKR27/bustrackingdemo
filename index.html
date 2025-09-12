@@ -44,7 +44,7 @@
     <button id="alarmBtn">Secure Alarm</button>
   </div>
   <div id="map"></div>
-  <div id="etaBox">🕒 Arrival Time: Not Set</div>
+  <div id="etaBox">🕒 Arrival Info: Not Set</div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -182,7 +182,7 @@
     if (route.length) busMarker.setLatLng(route[0]);
     busMarker.setIcon(busIcon);
     busMarker.bindPopup("Bus");
-    document.getElementById('etaBox').innerText = "🕒 Arrival Time: Not Set";
+    document.getElementById('etaBox').innerText = "🕒 Arrival Info: Not Set";
   }
 
   document.getElementById('startBtn').addEventListener('click', () => startAnimation());
@@ -220,16 +220,18 @@
     for (let i=0; i<route.length-1; i++) {
       totalDist += haversineDistance(route[i][0], route[i][1], route[i+1][0], route[i+1][1]);
     }
+    const totalDistKm = (totalDist / 1000).toFixed(2);
     const totalTimeSec = totalDist / BUS_SPEED_MPS;
     const arrivalTime = new Date(Date.now() + totalTimeSec * 1000);
 
     document.getElementById('etaBox').innerText =
-      "🕒 Expected Arrival Time: " + formatTime(arrivalTime);
+      `🕒 Expected Arrival Time: ${formatTime(arrivalTime)} | 📏 Distance: ${totalDistKm} km`;
 
     // Voice announcement
     const startName = cityOrder[startIdx].name.charAt(0).toUpperCase() + cityOrder[startIdx].name.slice(1);
     const endName = cityOrder[endIdx].name.charAt(0).toUpperCase() + cityOrder[endIdx].name.slice(1);
-    speak(`The bus is starting from ${startName} and will reach ${endName} at around ${formatTime(arrivalTime)}.`);
+    speak(`The bus is starting from ${startName} and will reach ${endName}. 
+           The total distance is ${totalDistKm} kilometers and the expected arrival time is around ${formatTime(arrivalTime)}.`);
   });
 
   // ----------------------------
