@@ -14,6 +14,14 @@
     select { padding:4px 6px; margin-right:6px; }
     .bus-box { margin-top:10px; font-weight:bold; background:#f9f9f9; padding:6px; border-radius:5px; border:1px solid #ccc; }
     .bus-header { font-size:14px; font-weight:bold; margin-bottom:4px; }
+    .bus-label {
+      background:white;
+      padding:2px 4px;
+      border:1px solid #333;
+      border-radius:3px;
+      font-size:10px;
+      font-weight:bold;
+    }
   </style>
 </head>
 <body>
@@ -21,7 +29,7 @@
   
   <!-- Bus 1 Controls -->
   <div class="controls">
-    <div class="bus-header">🚌 Bus 1</div>
+    <div class="bus-header">🚌 Bus 1 — Patiala Express (#PB10-1234)</div>
     <label>Start:
       <select id="start1">
         <option value="patiala">Patiala</option>
@@ -48,7 +56,7 @@
 
   <!-- Bus 2 Controls -->
   <div class="controls">
-    <div class="bus-header">🚌 Bus 2</div>
+    <div class="bus-header">🚌 Bus 2 — Nabha Cityliner (#PB11-5678)</div>
     <label>Start:
       <select id="start2">
         <option value="patiala">Patiala</option>
@@ -75,7 +83,7 @@
 
   <!-- Bus 3 Controls -->
   <div class="controls">
-    <div class="bus-header">🚌 Bus 3</div>
+    <div class="bus-header">🚌 Bus 3 — Morinda Shuttle (#PB12-9012)</div>
     <label>Start:
       <select id="start3">
         <option value="patiala">Patiala</option>
@@ -119,29 +127,32 @@
   ];
 
   const BUS_SPEED_MPS = 27.7; // ~100 km/h
-  const colors = ["#2E86AB","#28B463","#AF7AC5"]; // 3 routes
+  const colors = ["#2E86AB","#28B463","#AF7AC5"]; 
 
-  // Map
+  // Bus metadata
+  const busMeta = {
+    1: { name: "Patiala Express", number: "PB10-1234" },
+    2: { name: "Nabha Cityliner", number: "PB11-5678" },
+    3: { name: "Morinda Shuttle", number: "PB12-9012" }
+  };
+
   const map = L.map('map').setView(cityOrder[0].coords, 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
 
-  // City markers
   cityOrder.forEach(c => {
     L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
       .addTo(map).bindPopup(c.name.charAt(0).toUpperCase()+c.name.slice(1));
   });
 
-  // Bus Data Structures
   let buses = {
-    1: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+    1: { route:[], poly:null, marker:null, label:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
          segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 },
-    2: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+    2: { route:[], poly:null, marker:null, label:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
          segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 },
-    3: { route:[], poly:null, marker:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
+    3: { route:[], poly:null, marker:null, label:null, distances:[], animating:false, seg:0, segStart:null, segEnd:null,
          segDur:0, segStartTime:null, raf:null, total:0, covered:0, lastKmMilestone:0 }
   };
 
-  // Bus Icons
   function busIcon(color) {
     return L.icon({
       iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61205.png",
@@ -151,7 +162,6 @@
     });
   }
 
-  // Helpers
   function haversine(lat1, lon1, lat2, lon2) {
     const R=6371000,toRad=d=>d*Math.PI/180;
     const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
@@ -160,9 +170,14 @@
   }
   function lerp(a,b,t){return a+(b-a)*t;}
   function formatTime(d){return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
-  function speak(msg){window.speechSynthesis.speak(new SpeechSynthesisUtterance(msg));}
 
-  // Set Route
+  // Punjabi Voice
+  function speak(msgPa){
+    const utter = new SpeechSynthesisUtterance(msgPa);
+    utter.lang = "pa-IN"; 
+    window.speechSynthesis.speak(utter);
+  }
+
   function setRoute(id){
     const start=document.getElementById("start"+id).value;
     const end=document.getElementById("end"+id).value;
@@ -178,7 +193,6 @@
     bus.poly=L.polyline(r,{color:colors[id-1],weight:5}).addTo(map);
     map.fitBounds(bus.poly.getBounds(),{padding:[50,50]});
     resetAnimation(id);
-    // Distances
     bus.distances=[]; bus.total=0;
     for(let i=0;i<r.length-1;i++){
       const d=haversine(r[i][0],r[i][1],r[i+1][0],r[i+1][1]);
@@ -187,11 +201,11 @@
     const km=(bus.total/1000).toFixed(2);
     const etaSec=bus.total/BUS_SPEED_MPS;
     const arr=new Date(Date.now()+etaSec*1000);
-    document.getElementById("eta"+id).innerText=`🚌 Bus ${id} | Distance: ${km} km | ETA: ${formatTime(arr)}`;
-    speak(`Bus ${id} will travel ${km} kilometers. Arrival at ${formatTime(arr)}.`);
+    document.getElementById("eta"+id).innerText=
+      `🚌 ${busMeta[id].name} (#${busMeta[id].number}) | Distance: ${km} km | ETA: ${formatTime(arr)}`;
+    speak(`${busMeta[id].name}, ਬੱਸ ਨੰਬਰ ${busMeta[id].number}, ਕੁੱਲ ਦੂਰੀ ${km} ਕਿਲੋਮੀਟਰ ਹੈ। ਉਮੀਦ ਹੈ ਕਿ ਬੱਸ ${formatTime(arr)} ਤੱਕ ਪਹੁੰਚ ਜਾਵੇਗੀ।`);
   }
 
-  // Start Animation
   function startAnimation(id){
     const bus=buses[id];
     if(bus.animating||bus.route.length<2)return;
@@ -201,7 +215,11 @@
 
   function startSeg(id){
     const bus=buses[id];
-    if(bus.seg>=bus.route.length-1){bus.animating=false;speak(`Bus ${id} has finished its route.`);return;}
+    if(bus.seg>=bus.route.length-1){
+      bus.animating=false;
+      speak(`${busMeta[id].name}, ਬੱਸ ਨੰਬਰ ${busMeta[id].number}, ਆਪਣੀ ਆਖਰੀ ਮੰਜ਼ਿਲ ’ਤੇ ਪਹੁੰਚ ਗਈ ਹੈ।`);
+      return;
+    }
     bus.segStart={lat:bus.route[bus.seg][0],lng:bus.route[bus.seg][1]};
     bus.segEnd={lat:bus.route[bus.seg+1][0],lng:bus.route[bus.seg+1][1]};
     const dist=bus.distances[bus.seg];
@@ -217,45 +235,58 @@
     const t=Math.min(1,elapsed/bus.segDur);
     const lat=lerp(bus.segStart.lat,bus.segEnd.lat,t);
     const lng=lerp(bus.segStart.lng,bus.segEnd.lng,t);
-    if(!bus.marker) bus.marker=L.marker([lat,lng],{icon:busIcon(colors[id-1])}).addTo(map);
-    else bus.marker.setLatLng([lat,lng]);
+    if(!bus.marker){
+      bus.marker=L.marker([lat,lng],{icon:busIcon(colors[id-1])})
+        .addTo(map).bindPopup(`${busMeta[id].name} (#${busMeta[id].number})`);
+      bus.label=L.marker([lat,lng],{
+        icon:L.divIcon({className:"bus-label",html:busMeta[id].number,iconSize:[40,15],iconAnchor:[20,-10]})
+      }).addTo(map);
+    } else {
+      bus.marker.setLatLng([lat,lng]);
+      bus.label.setLatLng([lat,lng]);
+    }
     const segDist=bus.distances[bus.seg];
     const coveredNow=bus.covered+segDist*t;
     const remain=bus.total-coveredNow;
     const etaSec=remain/BUS_SPEED_MPS;
     const eta=new Date(Date.now()+etaSec*1000);
     document.getElementById("eta"+id).innerText=
-      `🚌 Bus ${id} | Covered ${(coveredNow/1000).toFixed(2)} km | Remaining ${(remain/1000).toFixed(2)} km | ETA: ${formatTime(eta)}`;
-    // Milestone announcement every 5 km
+      `🚌 ${busMeta[id].name} (#${busMeta[id].number}) | Covered ${(coveredNow/1000).toFixed(2)} km | Remaining ${(remain/1000).toFixed(2)} km | ETA: ${formatTime(eta)}`;
     const kmDone=Math.floor(coveredNow/1000);
     if(kmDone>=bus.lastKmMilestone+5){
       bus.lastKmMilestone=kmDone;
-      speak(`Bus ${id} has covered ${kmDone} kilometers.`);
+      speak(`${busMeta[id].name}, ਬੱਸ ਨੰਬਰ ${busMeta[id].number}, ਨੇ ਹੁਣ ਤੱਕ ${kmDone} ਕਿਲੋਮੀਟਰ ਤੈਅ ਕਰ ਲਿਆ ਹੈ।`);
     }
     if(t<1){bus.raf=requestAnimationFrame(ts=>step(id,ts));}
     else{
       bus.covered+=segDist;
       const city=cityOrder.find(c=>Math.abs(c.coords[0]-bus.segEnd.lat)<0.01&&Math.abs(c.coords[1]-bus.segEnd.lng)<0.01);
-      if(city){speak(`Bus ${id} has reached ${city.name}.`);}
+      if(city){speak(`${busMeta[id].name}, ਬੱਸ ਨੰਬਰ ${busMeta[id].number}, ${city.name} ਪਹੁੰਚ ਗਈ ਹੈ।`);}
       bus.seg++; setTimeout(()=>startSeg(id),600);
     }
   }
 
-  // Reset
   function resetAnimation(id){
     const bus=buses[id];
     cancelAnimationFrame(bus.raf);
     bus.animating=false; bus.seg=0; bus.covered=0;
     if(bus.route.length){
-      if(!bus.marker) bus.marker=L.marker(bus.route[0],{icon:busIcon(colors[id-1])}).addTo(map);
-      else bus.marker.setLatLng(bus.route[0]);
+      if(!bus.marker) {
+        bus.marker=L.marker(bus.route[0],{icon:busIcon(colors[id-1])})
+          .addTo(map).bindPopup(`${busMeta[id].name} (#${busMeta[id].number})`);
+        bus.label=L.marker(bus.route[0],{
+          icon:L.divIcon({className:"bus-label",html:busMeta[id].number,iconSize:[40,15],iconAnchor:[20,-10]})
+        }).addTo(map);
+      } else {
+        bus.marker.setLatLng(bus.route[0]);
+        bus.label.setLatLng(bus.route[0]);
+      }
     }
-    document.getElementById("eta"+id).innerText=`ℹ️ Bus ${id} info will appear here.`;
+    document.getElementById("eta"+id).innerText=`ℹ️ ${busMeta[id].name} (#${busMeta[id].number}) info will appear here.`;
   }
 
-  // Help & Alarm
   document.getElementById('helpBtn').onclick=()=>alert("📖 Help:\n1. Select Start & End.\n2. Set Route.\n3. Start.\n☎️ Support: 1800-123-4567");
-  document.getElementById('alarmBtn').onclick=()=>{speak("Emergency! Authorities have been alerted.");alert("🚨 Emergency activated! Call 100 or 112.");};
+  document.getElementById('alarmBtn').onclick=()=>{speak("ਐਮਰਜੈਂਸੀ! ਪੁਲਿਸ ਨੂੰ ਸੂਚਿਤ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।");alert("🚨 Emergency activated! Call 100 or 112.");};
   </script>
 </body>
 </html>
