@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Bus Tracking Prototype (Smooth Animation)</title>
+  <title>Bus Tracking Prototype — Punjab Small Cities</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
@@ -10,15 +10,30 @@
     #map { height: 520px; width: 100%; border: 1px solid #ccc; border-radius: 6px; }
     h2 { margin: 6px 0 12px; }
     .controls { margin: 8px 0; }
-    button { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; }
+    button { padding: 8px 12px; border-radius: 5px; border: none; cursor: pointer; margin-left:4px; }
+    select { padding:4px 6px; margin-right:6px; }
   </style>
 </head>
 <body>
-  <h2>🚍 Real-Time Bus Tracking — Prototype</h2>
+  <h2>🚍 Real-Time Bus Tracking — Punjab Small Cities (Prototype)</h2>
   <div class="controls">
+    <label>Start: 
+      <select id="startSelect">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <label>End: 
+      <select id="endSelect">
+        <option value="patiala">Patiala</option>
+        <option value="nabha">Nabha</option>
+        <option value="sirhind">Sirhind</option>
+      </select>
+    </label>
+    <button id="setRouteBtn">Set Route</button>
     <button id="startBtn">Start Animation</button>
     <button id="resetBtn">Reset</button>
-    <span style="margin-left:12px; color:#666">Tip: open on laptop for demo, or host it to share a link.</span>
   </div>
   <div id="map"></div>
 
@@ -27,77 +42,62 @@
   // ----------------------------
   // Configuration
   // ----------------------------
-  // default starting view (change to your city coordinates)
-  const startView = [12.9716, 77.5946]; // example: Punjab
-  const initialZoom = 14;
+  const initialView = [30.3398, 76.3869]; // Patiala
+  const initialZoom = 12;
+  const BUS_SPEED_MPS = 12; // ~43 km/h
 
-  // route points (latitude, longitude) - add or replace with your city's route
-  const route = [
-    [30.3398, 76.3869], // Patiala
-    [30.3745, 76.1520], // Nabha
-    [30.6450, 76.3841], // Sirhind
-    [30.7910, 76.4926], //Morinda
-    [30.8360, 76.5754], //Kurali
+  // Cities in order along the main route
+  const cityOrder = [
+    { name: "patiala", coords: [30.3398, 76.3869] },
+    { name: "nabha",   coords: [30.3745, 76.1520] },
+    { name: "sirhind", coords: [30.6450, 76.3841] }
   ];
 
-  // pick stop indices from route array (these will show as stops)
-  const stopIndices = [0, 1, 2, 3, 4];
-
-  // bus speed in meters/second (adjust to simulate faster/slower bus)
-  const BUS_SPEED_MPS = 60; // ~80 km/h
+  let route = [];
+  let poly = null;
 
   // ----------------------------
   // Helpers
   // ----------------------------
-  // Haversine distance in meters:
   function haversineDistance(lat1, lon1, lat2, lon2) {
     const R = 6371000;
-    const toRad = (deg) => deg * Math.PI / 180;
+    const toRad = deg => deg * Math.PI / 180;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   }
-
-  // Linear interpolation between two latlngs (good enough for short segments)
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   // ----------------------------
   // Initialize Map
   // ----------------------------
-  const map = L.map('map').setView(startView, initialZoom);
+  const map = L.map('map').setView(initialView, initialZoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
 
-  // draw route polyline
-  const poly = L.polyline(route, {color: '#2E86AB', weight: 5, opacity: 0.8}).addTo(map);
-  map.fitBounds(poly.getBounds(), {padding: [50,50]});
-
-  // add bus stop markers
-  stopIndices.forEach((idx, i) => {
-    const latlng = route[idx];
-    L.circleMarker(latlng, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
-      .addTo(map).bindPopup("Stop " + (i+1));
+  // Bus stops markers
+  const stopMarkers = cityOrder.map((c,i) => {
+    return L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
+      .addTo(map).bindPopup(c.name.charAt(0).toUpperCase() + c.name.slice(1));
   });
 
-  // Bus icon (local file 'bus.png' in same folder) with fallback to an online icon if not found
+  // Bus icon
   const busIcon = L.icon({
-    iconUrl: 'bus.png.png',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61205.png',
     iconSize: [42, 42],
     iconAnchor: [21, 21]
   });
-
-  // Add marker at the first route point
-  let busMarker = L.marker(route[0], {icon: busIcon}).addTo(map).bindPopup("Bus 1");
+  let busMarker = L.marker(initialView, {icon: busIcon}).addTo(map).bindPopup("Bus");
 
   // ----------------------------
-  // Animation logic
+  // Animation
   // ----------------------------
   let animating = false;
-  let currentSegment = 0; // index in route: segment = route[currentSegment] -> route[currentSegment+1]
+  let currentSegment = 0;
   let rafId = null;
   let segmentStartTime = null;
   let segmentDurationMs = 0;
@@ -105,54 +105,44 @@
   let segEndLatLng = null;
 
   function startSegment(idx) {
-    if (idx >= route.length - 1) {
-      console.log('Reached end of route');
-      animating = false;
-      return;
-    }
+    if (idx >= route.length - 1) { animating = false; return; }
     currentSegment = idx;
     segStartLatLng = {lat: route[idx][0], lng: route[idx][1]};
     segEndLatLng   = {lat: route[idx+1][0], lng: route[idx+1][1]};
-    const dist = haversineDistance(segStartLatLng.lat, segStartLatLng.lng, segEndLatLng.lat, segEndLatLng.lng); // meters
+    const dist = haversineDistance(segStartLatLng.lat, segStartLatLng.lng, segEndLatLng.lat, segEndLatLng.lng);
     const durationSec = dist / BUS_SPEED_MPS;
-    segmentDurationMs = Math.max(300, Math.round(durationSec * 1000)); // min duration 300ms for very small segments
+    segmentDurationMs = Math.max(300, Math.round(durationSec * 1000));
     segmentStartTime = null;
-    // start RAF
     rafId = requestAnimationFrame(step);
   }
 
   function step(timestamp) {
     if (!segmentStartTime) segmentStartTime = timestamp;
     const elapsed = timestamp - segmentStartTime;
-    const t = Math.min(1, elapsed / segmentDurationMs); // progress 0..1
+    const t = Math.min(1, elapsed / segmentDurationMs);
 
-    // interpolate lat/lng
     const lat = lerp(segStartLatLng.lat, segEndLatLng.lat, t);
     const lng = lerp(segStartLatLng.lng, segEndLatLng.lng, t);
     busMarker.setLatLng([lat, lng]);
 
-    // optional: update popup with ETA to next stop
     const remainingDist = haversineDistance(lat, lng, segEndLatLng.lat, segEndLatLng.lng);
     const etaSec = Math.round(remainingDist / BUS_SPEED_MPS);
-    busMarker.bindPopup("Bus 1 — ETA to next stop: " + etaSec + " s");
+    busMarker.bindPopup("Bus — ETA: " + etaSec + " s");
 
     if (t < 1) {
       rafId = requestAnimationFrame(step);
     } else {
-      // segment finished - move to next
       currentSegment++;
       if (currentSegment < route.length - 1) {
-        // small pause at stops (simulate dwell time)
         setTimeout(() => startSegment(currentSegment), 800);
       } else {
         animating = false;
-        console.log('Completed route.');
       }
     }
   }
 
   function startAnimation() {
-    if (animating) return;
+    if (animating || route.length < 2) return;
     animating = true;
     startSegment(0);
   }
@@ -161,16 +151,44 @@
     cancelAnimationFrame(rafId);
     animating = false;
     currentSegment = 0;
-    busMarker.setLatLng(route[0]);
-    busMarker.bindPopup("Bus 1");
+    if (route.length) busMarker.setLatLng(route[0]);
+    busMarker.bindPopup("Bus");
   }
 
-  // Buttons
   document.getElementById('startBtn').addEventListener('click', () => startAnimation());
   document.getElementById('resetBtn').addEventListener('click', () => resetAnimation());
 
-  // auto-start for demo when page loads
-  // setTimeout(startAnimation, 800);
+  // ----------------------------
+  // Set Route Button
+  // ----------------------------
+  document.getElementById('setRouteBtn').addEventListener('click', () => {
+    const startCity = document.getElementById('startSelect').value;
+    const endCity   = document.getElementById('endSelect').value;
+
+    if (startCity === endCity) {
+      alert("Start and End cannot be the same!");
+      return;
+    }
+
+    const startIdx = cityOrder.findIndex(c => c.name === startCity);
+    const endIdx   = cityOrder.findIndex(c => c.name === endCity);
+
+    // Slice route based on direction
+    if (startIdx < endIdx) {
+      route = cityOrder.slice(startIdx, endIdx + 1).map(c => c.coords);
+    } else {
+      route = cityOrder.slice(endIdx, startIdx + 1).map(c => c.coords).reverse();
+    }
+
+    // Clear old polyline
+    if (poly) map.removeLayer(poly);
+
+    // Draw new route
+    poly = L.polyline(route, {color: '#2E86AB', weight: 5}).addTo(map);
+    map.fitBounds(poly.getBounds(), {padding: [50,50]});
+
+    resetAnimation();
+  });
   </script>
 </body>
 </html>
