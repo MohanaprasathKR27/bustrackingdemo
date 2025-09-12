@@ -21,6 +21,8 @@
       <select id="startSelect">
         <option value="patiala">Patiala</option>
         <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
         <option value="sirhind">Sirhind</option>
       </select>
     </label>
@@ -28,6 +30,8 @@
       <select id="endSelect">
         <option value="patiala">Patiala</option>
         <option value="nabha">Nabha</option>
+        <option value="morinda">Morinda</option>
+        <option value="kurali">Kurali</option>
         <option value="sirhind">Sirhind</option>
       </select>
     </label>
@@ -43,13 +47,15 @@
   // Configuration
   // ----------------------------
   const initialView = [30.3398, 76.3869]; // Patiala
-  const initialZoom = 12;
-  const BUS_SPEED_MPS = 70; // ~43 km/h
+  const initialZoom = 11;
+  const BUS_SPEED_MPS = 12; // ~43 km/h
 
   // Cities in order along the main route
   const cityOrder = [
     { name: "patiala", coords: [30.3398, 76.3869] },
     { name: "nabha",   coords: [30.3745, 76.1520] },
+    { name: "morinda", coords: [30.6380, 76.5110] },
+    { name: "kurali",  coords: [30.6820, 76.7400] },
     { name: "sirhind", coords: [30.6450, 76.3841] }
   ];
 
@@ -80,7 +86,7 @@
   }).addTo(map);
 
   // Bus stops markers
-  const stopMarkers = cityOrder.map((c,i) => {
+  const stopMarkers = cityOrder.map(c => {
     return L.circleMarker(c.coords, {radius:6, fill:true, color:'#ff5c5c', fillOpacity:1})
       .addTo(map).bindPopup(c.name.charAt(0).toUpperCase() + c.name.slice(1));
   });
@@ -173,17 +179,13 @@
     const startIdx = cityOrder.findIndex(c => c.name === startCity);
     const endIdx   = cityOrder.findIndex(c => c.name === endCity);
 
-    // Slice route based on direction
     if (startIdx < endIdx) {
       route = cityOrder.slice(startIdx, endIdx + 1).map(c => c.coords);
     } else {
       route = cityOrder.slice(endIdx, startIdx + 1).map(c => c.coords).reverse();
     }
 
-    // Clear old polyline
     if (poly) map.removeLayer(poly);
-
-    // Draw new route
     poly = L.polyline(route, {color: '#2E86AB', weight: 5}).addTo(map);
     map.fitBounds(poly.getBounds(), {padding: [50,50]});
 
